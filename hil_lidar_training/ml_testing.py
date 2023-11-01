@@ -48,7 +48,7 @@ from keras_core.models import load_model
 class ControlNode(Node):
     def __init__(self):
         super().__init__('control_node')
-
+        
         # update frequency of this node
         self.freq = 10.0
 
@@ -247,19 +247,19 @@ class ControlNode(Node):
         ## get error state
         e_flw = self.follow_error()
         e = self.error_state()
-        # # #implement NN model for first car doing oa
+        # # #implement NN model for car doing oa
         self.get_logger().info("running neural network")
-        # self.get_logger().info("lidar data: %s" % np.array(list(self.raw_lidar_data)).shape)
         lidar_input = np.array(list(self.reduced_lidar_data))
         error_input = np.array(e)
         nn_input = np.concatenate((error_input,lidar_input)).reshape(1,22)
         self.steering_flw = self.model.predict(nn_input)[0][0]
-        #self.get_logger().info("steering: %s" % self.steering)
+       
         ### implement NN for following
         nn_input_flw = np.array(e_flw).reshape(1,4)
         flw_predict = self.model_flw.predict(nn_input_flw)
         self.steering = flw_predict[0][1]
         self.throttle = flw_predict[0][0]
+        
         ### for vehicle one
         msg = VehicleInput()
         msg.steering = np.clip(self.steering, -1.0, 1.0)
@@ -273,17 +273,7 @@ class ControlNode(Node):
         # self.get_logger().info("sending vehicle inputs: %s" % msg)
         self.pub_vehicle_cmd.publish(msg)
         self.pub_vehicle_cmd_1.publish(msg_flw)
-        # ## record data
-        # lidar_data_str = ','.join(map(str, self.reduced_lidar_data))
-        # with open ('training_following_data.csv','a', encoding='UTF8') as csvfile:
-        #         my_writer = csv.writer(csvfile, quoting=csv.QUOTE_NONE, escapechar=' ')
-        #         #for row in pt:
-        #         my_writer.writerow([e_flw[0],e_flw[1],e_flw[2],e_flw[3],msg.throttle,msg.steering])
-        #         csvfile.close()
 
-        # self.get_logger().info('Inputs %s' % self.recorded_inputs[0,:])
-
-        # self.get_logger().info('Inputs from file: (t=%s, (%s,%s,%s)),' % (t,self.throttle,self.braking,self.steering))
 
 def main(args=None):
     rclpy.init(args=args)
@@ -296,4 +286,3 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
-

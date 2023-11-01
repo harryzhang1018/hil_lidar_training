@@ -11,6 +11,10 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
+    py_modules=[
+        'hil_lidar_training.ml_training',
+        'hil_lidar_training.ml_testing'
+    ],
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='art',
@@ -20,7 +24,8 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'ml_training = hil_lidar_training.ml_training:main'
+            'ml_training = hil_lidar_training.ml_training:main',
+            'ml_testing = hil_lidar_training.ml_testing:main',
         ],
     },
 )
