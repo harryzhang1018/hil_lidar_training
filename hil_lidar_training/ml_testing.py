@@ -79,9 +79,9 @@ class ControlNode(Node):
         self.go = False
         self.vehicle_cmd = VehicleInput()
         self.lidar_data = LaserScan()
-        self.model = load_model('/home/art/art/workspace/steering_ao.keras')
-        self.model_flw = load_model('/home/art/art/workspace/nn_follow.keras')
-        self.file = open("/home/art/art/workspace/path2.csv")
+        self.model = load_model('/home/art/art/workspace/nn_models/nn_oatracking.keras')
+        self.model_flw = load_model('/home/art/art/workspace/nn_models/nn_follow.keras')
+        self.file = open("/home/art/art/workspace/paths/lot17_sinsquare.csv")
         self.ref_traj = np.loadtxt(self.file,delimiter=",")
         self.lookahead = 0.0
         # publishers and subscribers
@@ -250,10 +250,19 @@ class ControlNode(Node):
         # # #implement NN model for car doing oa
         self.get_logger().info("running neural network")
         lidar_input = np.array(list(self.reduced_lidar_data))
+        self.get_logger().info("lidar input: %s" % lidar_input)
         error_input = np.array(e)
         nn_input = np.concatenate((error_input,lidar_input)).reshape(1,22)
-        self.steering_flw = self.model.predict(nn_input)[0][0]
-       
+        self.throttle_flw = self.model.predict(nn_input)[0][0]
+        steering= self.model.predict(nn_input)[0][1]
+        # ensure steering can't change too much between timesteps, smooth transition
+        delta_steering = steering - self.steering_flw
+        if abs(delta_steering) > 0.25:
+            self.steering_flw = self.steering_flw + 0.25 * delta_steering / abs(delta_steering)
+            self.get_logger().info("steering changed too much, smoothing")
+        else:
+            self.steering_flw = steering
+
         ### implement NN for following
         nn_input_flw = np.array(e_flw).reshape(1,4)
         flw_predict = self.model_flw.predict(nn_input_flw)
@@ -261,17 +270,17 @@ class ControlNode(Node):
         self.throttle = flw_predict[0][0]
         
         ### for vehicle one
-        msg = VehicleInput()
-        msg.steering = np.clip(self.steering, -1.0, 1.0)
-        msg.throttle = np.clip(self.throttle, 0, 1)
-        msg.braking = np.clip(self.braking, 0, 1)
+        # msg = VehicleInput()
+        # msg.steering = np.clip(self.steering, -1.0, 1.0)
+        # msg.throttle = np.clip(self.throttle, 0, 1)
+        # msg.braking = np.clip(self.braking, 0, 1)
         ### for vehicle two
         msg_flw = VehicleInput()
         msg_flw.steering = np.clip(self.steering_flw, -1.0, 1.0)
         msg_flw.throttle = np.clip(self.throttle_flw, 0, 1)
         msg_flw.braking = np.clip(self.braking, 0, 1)
         # self.get_logger().info("sending vehicle inputs: %s" % msg)
-        self.pub_vehicle_cmd.publish(msg)
+        # self.pub_vehicle_cmd.publish(msg)
         self.pub_vehicle_cmd_1.publish(msg_flw)
 
 
