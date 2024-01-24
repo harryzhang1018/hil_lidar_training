@@ -58,7 +58,7 @@ class ControlNode(Node):
         package_share_directory = get_package_share_directory('hil_lidar_training')
         # initialize control inputs
         self.steering = 0.0
-        self.throttle = 0.0
+        self.throttle = 0.7
         self.braking = 0.0
 
         # initialize vehicle state
@@ -73,9 +73,9 @@ class ControlNode(Node):
         self.go = False
         self.vehicle_cmd = VehicleInput()
         self.lidar_data = LaserScan()
-        self.file = open("/home/art/art/workspace/paths/sin_path.csv")
+        self.file = open("/sbel/Desktop/paths/trajectory_data_smth15_3.csv")
         self.ref_traj = np.loadtxt(self.file,delimiter=",")
-        self.lookahead = 0.0
+        self.lookahead = 1.0
         # publishers and subscribers
         qos_profile = QoSProfile(depth=1)
         qos_profile.history = QoSHistoryPolicy.KEEP_LAST
@@ -168,8 +168,8 @@ class ControlNode(Node):
         self.reduced_lidar_data = self.reduce_lidar()
     
     def reduce_lidar(self):
-        reduced_lidar_data = [30.0 if x == 0.0 else x for x in self.raw_lidar_data]
-        reduce_chunk = 10
+        reduced_lidar_data = [8.0 if x == 0.0 else x for x in self.raw_lidar_data]
+        reduce_chunk = 5
         reduced_lidar_data = [min(reduced_lidar_data[i:i+reduce_chunk]) for i in range(0,len(reduced_lidar_data),reduce_chunk)]
         return reduced_lidar_data
 
@@ -189,7 +189,7 @@ class ControlNode(Node):
         self.pub_vehicle_cmd.publish(msg)
         ## record data
         lidar_data_str = ','.join(map(str, self.reduced_lidar_data))
-        with open ('training_oatracking_data_6.csv','a', encoding='UTF8') as csvfile:
+        with open ('training_oatracking_data_9.csv','a', encoding='UTF8') as csvfile:
                 my_writer = csv.writer(csvfile, quoting=csv.QUOTE_NONE, escapechar=' ')
                 #for row in pt:
                 my_writer.writerow([e[0],e[1],e[2],e[3],lidar_data_str,msg.throttle,msg.steering])
