@@ -34,7 +34,7 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import Twist, PoseStamped, TwistStamped
 from chrono_ros_interfaces.msg import DriverInputs as VehicleInput
 from chrono_ros_interfaces.msg import Body
 from nav_msgs.msg import Path
@@ -74,21 +74,22 @@ class ControlNode(Node):
         self.go = False
         self.vehicle_cmd = VehicleInput()
         self.lidar_data = LaserScan()
-        self.model = load_model('/sbel/Desktop/nn_path_flw_oa_0112_aug.keras')
-        self.file = open("/sbel/Desktop/paths/lot17_sinsquare.csv")
+        self.model = load_model('/sbel/Desktop/ros_ws/src/nn_models_lib/nn_path_flw_oa_0112_aug.keras')
+        self.file = open("/sbel/Desktop/waypoints_paths/circ_r5_ccw.csv")
         self.ref_traj = np.loadtxt(self.file,delimiter=",")
         self.lookahead = 1.0
         # publishers and subscribers
         qos_profile = QoSProfile(depth=1)
         qos_profile.history = QoSHistoryPolicy.KEEP_LAST
-        self.sub_state = self.create_subscription(Body, '/chrono_ros_node/output/vehicle/state', self.state_callback, qos_profile)
+        self.sub_state = self.create_subscription(PoseStamped, '/chrono_ros_node/output/vehicle/state/pose', self.state_callback, qos_profile)
+        self.sub_vel = self.create_subscription(TwistStamped, '/chrono_ros_node/output/vehicle/state/twist', self.vel_callback, qos_profile)
         self.pub_vehicle_cmd = self.create_publisher(VehicleInput, '/chrono_ros_node/input/driver_inputs', 10)
         self.sub_PCdata = self.create_subscription(LaserScan,'/chrono_ros_node/output/lidar_2d/data/laser_scan',self.lidar_callback,qos_profile)
         self.timer = self.create_timer(1/self.freq, self.pub_callback)
     # subscribe manual control inputs
     # function to process data this class subscribes to
     def state_callback(self, msg):
-        # self.get_logger().info("Received '%s'" % msg)
+        #self.get_logger().info("Received '%s'" % msg)
         self.state = msg
         self.x = msg.pose.position.x
         self.y = msg.pose.position.y
@@ -98,10 +99,13 @@ class ControlNode(Node):
         e2 = msg.pose.orientation.z
         e3 = msg.pose.orientation.w
         self.theta = np.arctan2(2*(e0*e3+e1*e2),e0**2+e1**2-e2**2-e3**2)
-        self.v = np.sqrt(msg.twist.linear.x ** 2 + msg.twist.linear.y ** 2)
+        
         #self.get_logger().info("(x, y, theta, v): (%s,%s,%s,%s)" % (self.x, self.y ,self.theta,self.v))
         
-        
+    def vel_callback(self, msg):
+        self.v = np.sqrt(msg.twist.linear.x ** 2 + msg.twist.linear.y ** 2)
+            
+    
     def error_state(self):
         x_current = self.x
         y_current = self.y
@@ -171,6 +175,7 @@ class ControlNode(Node):
             return
         ## get error state
         e = self.error_state()
+        self.get_logger().info('error state: %s' % e)
         # # #implement NN model for car doing oa
         self.get_logger().info("running neural network")
         lidar_input = np.array(list(self.reduced_lidar_data))
@@ -193,8 +198,14 @@ class ControlNode(Node):
         msg.throttle = np.clip(self.throttle, 0, 1)
         msg.braking = np.clip(self.braking, 0, 1)
         ### for vehicle two
-        self.get_logger().info("sending vehicle inputs: %s" % msg)
+        #self.get_logger().info("sending vehicle inputs: %s" % msg)
         self.pub_vehicle_cmd.publish(msg)
+        
+        with open ('ft_1b_nn_3.csv','a', encoding='UTF8') as csvfile:
+                my_writer = csv.writer(csvfile, quoting=csv.QUOTE_NONE, escapechar=' ')
+                #for row in pt:
+                my_writer.writerow([e[0],e[1],e[2],e[3],self.x,self.y,msg.throttle,msg.steering])
+                csvfile.close()
 
 
 
